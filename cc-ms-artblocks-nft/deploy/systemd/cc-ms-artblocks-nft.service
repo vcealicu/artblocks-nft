@@ -1,0 +1,17 @@
+[Unit]
+Description=cc-ms-artblocks-nft.service
+After=network.target
+
+[Service]
+WorkingDirectory=/home/cc/cc-ms-artblocks-nft/
+EnvironmentFile=/home/cc/cc-ms-artblocks-nft/deploy/.env
+ExecStart=node cc-ms-artblocks-nft.js
+Restart=always
+RestartSec=600
+KillMode=control-group
+Type=simple
+User=cc
+Group=cc
+
+[Install]
+WantedBy=multi-user.target

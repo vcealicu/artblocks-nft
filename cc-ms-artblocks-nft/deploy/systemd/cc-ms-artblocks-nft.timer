@@ -1,0 +1,8 @@
+[Unit]
+Description=Delay timer for cc-ms-artblocks-nft.service
+
+[Timer]
+OnBootSec=10
+
+[Install]
+WantedBy=timers.target

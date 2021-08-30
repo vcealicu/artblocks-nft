@@ -1,0 +1,22 @@
+{
+    "name": "cc-ms-artblocks-nft",
+    "version": "1.0.0",
+    "description": "cc-ms-artblocks-nft",
+    "main": "cc-ms-artblocks-nft.js",
+    "private": true,
+    "directories": {},
+    "scripts": {
+        "build": "",
+        "prod": "node cc-ms-artblocks-nft.js"
+    },
+    "dependencies": {
+        "node-p5": "^1.0.4"
+    },
+    "devDependencies": {},
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/vcealicu/artblocks-nft"
+    },
+    "author": "",
+    "license": "CC BY-NC 4.0"
+}

@@ -1,0 +1,158 @@
+'use strict';
+const urlModule = require('url');
+const appHttp = require('http');
+
+const responseTypes = {
+    ok: 200,
+    notFound: 404,
+    notAuthorized: 401,
+    notAcceptable: 406,
+    rateLimit: 429
+};
+
+const responseBaseObject = {
+    Response: 'Success',
+    Message: '',
+    Type: 100,
+    Data: {}
+};
+const pathNotFoundError = {
+    Response: 'Error',
+    Message: 'Path does not exist.',
+    Type: 0,
+    Data: {}
+};
+const httpVerbNotAllowed = {
+    Response: 'Error',
+    Message: 'We only support GET as the http request type.',
+    Type: 0,
+    Data: {}
+};
+
+let allEndpoints = [];
+let serverForApi = {};
+
+serverForApi.getInfoFromRequest = function(request) {
+    let callParams = { INTERNAL: {} };
+    let urlObj = new urlModule.URL(request.url, `http://${request.headers.host}`);
+    callParams.INTERNAL.HEADERS = request.headers;
+
+    //copy over the getParams to callParams
+    for (const [getParamName, getParamValue] of urlObj.searchParams) {
+        if (getParamName === 'INTERNAL') { continue; }
+        callParams[getParamName] = getParamValue;
+    }
+
+    return { urlObj, callParams };
+};
+
+serverForApi.handleRequest = function(request, response) {
+    let { urlObj, callParams } = serverForApi.getInfoFromRequest(request);
+    if (request.method === 'OPTIONS') {
+        serverForApi.sendResponse(response, {}, 'application/json', '', responseTypes.ok);
+        return;
+    }
+    if (request.method === 'GET') {
+        serverForApi.routeRequestAndRespond(request.method, response, urlObj.pathname, callParams);
+        return;
+    }
+    if (request.method == 'POST' || request.method == 'PUT') {
+        let body = '';
+        request.on('data', function(data) {
+            body += data;
+
+            // Too much POST data, kill the connection!
+            // 2e6 === 2 * Math.pow(10, 6) === 2 * 1000000 ~~~ 2MB this is for the avatar upload
+            if (body.length > 2e6) {
+                request.connection.destroy();
+            }
+        });
+        request.on('end', function() {
+            callParams.INTERNAL.POST_BODY = body;
+            serverForApi.routeRequestAndRespond(request.method, response, urlObj.pathname, callParams);
+        });
+        return;
+    }
+
+    serverForApi.sendResponse(response, httpVerbNotAllowed, 'application/json', '', responseTypes.notAcceptable);
+};
+
+serverForApi.routeRequestAndRespond = function(requestMethod, response, currentPath, callParams) {
+    let endpointToExecute = allEndpoints.find(function(pathToCheck) { return pathToCheck.Url === currentPath; });
+    if (endpointToExecute === undefined || endpointToExecute.HttpVerb !== requestMethod) {
+        serverForApi.sendResponse(response, pathNotFoundError, 'application/json', '', responseTypes.notFound);
+        return;
+    }
+
+    let hitTimestamp = Math.floor(new Date().getTime() / 1000);
+
+    endpointToExecute.execute(callParams, hitTimestamp, function(err, responseData, fileName) {
+        if (err) {
+            const responseToSend = Object.assign({}, responseBaseObject);
+            responseToSend.Response = "Error";
+            if (err.frontend !== undefined) {
+                if (err.frontend.message !== undefined) {
+                    responseToSend.Message = err.frontend.message;
+                }
+                if (err.frontend.type !== undefined) {
+                    responseToSend.Type = err.frontend.type;
+                }
+            }
+            serverForApi.sendResponse(response, responseToSend, 'application/json', fileName, responseTypes.notAcceptable);
+            return;
+        }
+        serverForApi.sendResponse(response, responseData, 'image/png', fileName, responseTypes.ok);
+    });
+
+};
+
+serverForApi.sendResponse = function(response, responseData, responseContentType, fileName, statusCode) {
+    response.setHeader('Content-Security-Policy', 'frame-ancestors \'none\'');
+    if (responseContentType === 'image/png') {
+        console.log('inline; filename="' + fileName + '"');
+        response.setHeader('Content-Disposition', 'inline; filename="' + fileName + '"');
+        response.writeHead(statusCode, { 'Content-Type': responseContentType });
+        response.end(responseData);
+    } else {
+        response.writeHead(statusCode, { 'Content-Type': responseContentType });
+        response.end(JSON.stringify(responseData));
+    }
+};
+
+serverForApi.addEndpoint = function(newEndpoint) {
+    let existingEndpoint = allEndpoints.find(function(endpoint) { return endpoint.Url === newEndpoint.Url });
+    if (existingEndpoint !== undefined) {
+        console.log('Path: ' + newEndpoint.Url + ' is defined in Endpoint ' + existingEndpoint.Key + ' and in Endpoint ' + newEndpoint.Key);
+        process.exit(1);
+    }
+    allEndpoints.push(newEndpoint);
+};
+
+serverForApi.start = function(externalScriptParams, socketServer) {
+    let scriptParamsSanitizedForOutput = {};
+    for (let currentScriptParamName in externalScriptParams) {
+        scriptParamsSanitizedForOutput[currentScriptParamName] = externalScriptParams[currentScriptParamName];
+        if (currentScriptParamName.match(/CONNECTION_STRING/i)) {
+            scriptParamsSanitizedForOutput[currentScriptParamName] = scriptParamsSanitizedForOutput[currentScriptParamName].replace(/\/\/(.*)@/g, '//*******@');
+        }
+        if (currentScriptParamName.match(/_KEY/i)) {
+            scriptParamsSanitizedForOutput[currentScriptParamName] = '*******';
+        }
+        if (currentScriptParamName.match(/_SECRET/i)) {
+            scriptParamsSanitizedForOutput[currentScriptParamName] = '*******';
+        }
+    }
+    console.log('Params are ' + JSON.stringify(scriptParamsSanitizedForOutput));
+    let currentHttpServer = appHttp.createServer(serverForApi.handleRequest).listen(externalScriptParams.PORT, externalScriptParams.IP);
+    if (socketServer !== undefined) {
+        currentHttpServer.on('upgrade', function(request, socket, head) {
+            let requestInfo = serverForApi.getInfoFromRequest(request);
+            socketServer.handleUpgrade(request, socket, head, function done(ws) {
+                socketServer.emit('connection', ws, request, requestInfo);
+            });
+        });
+    }
+    return currentHttpServer;
+};
+
+module.exports = serverForApi;
