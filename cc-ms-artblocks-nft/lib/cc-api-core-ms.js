@@ -109,7 +109,6 @@ serverForApi.routeRequestAndRespond = function(requestMethod, response, currentP
 serverForApi.sendResponse = function(response, responseData, responseContentType, fileName, statusCode) {
     response.setHeader('Content-Security-Policy', 'frame-ancestors \'none\'');
     if (responseContentType === 'image/png') {
-        console.log('inline; filename="' + fileName + '"');
         response.setHeader('Content-Disposition', 'inline; filename="' + fileName + '"');
         response.writeHead(statusCode, { 'Content-Type': responseContentType });
         response.end(responseData);
