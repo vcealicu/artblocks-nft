@@ -7,7 +7,7 @@
     "directories": {},
     "scripts": {
         "build": "",
-        "prod": "node cc-ms-artblocks-nft.js"
+        "prod": "yarn install --force && node cc-ms-artblocks-nft.js"
     },
     "dependencies": {
         "node-p5": "^1.0.4"
