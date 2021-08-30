@@ -7,7 +7,7 @@
     "directories": {},
     "scripts": {
         "build": "",
-        "prod": "yarn install --force && pm2 start cc-ms-artblocks-nft.js PORT=80"
+        "prod": "yarn install --force && pm2 start cc-ms-artblocks-nft.js --PORT=80"
     },
     "dependencies": {
         "node-p5": "^1.0.4"
