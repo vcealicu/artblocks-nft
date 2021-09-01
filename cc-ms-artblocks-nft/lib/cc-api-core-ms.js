@@ -35,6 +35,7 @@ let serverForApi = {};
 serverForApi.getInfoFromRequest = function(request) {
     let callParams = { INTERNAL: {} };
     let urlObj = new urlModule.URL(request.url, `http://${request.headers.host}`);
+    let currentClientIp = request.headers['x-real-ip'] || request.headers['x-forwarded-for'] || request.connection.remoteAddress;
     callParams.INTERNAL.HEADERS = request.headers;
 
     //copy over the getParams to callParams
@@ -42,7 +43,7 @@ serverForApi.getInfoFromRequest = function(request) {
         if (getParamName === 'INTERNAL') { continue; }
         callParams[getParamName] = getParamValue;
     }
-
+    console.log(getParamValue, request.headers, currentClientIp);
     return { urlObj, callParams };
 };
 
