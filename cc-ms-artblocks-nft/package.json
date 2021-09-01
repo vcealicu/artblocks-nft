@@ -8,7 +8,7 @@
     "scripts": {
         "build": "",
         "localhost": "yarn install --force && node cc-ms-artblocks-nft.js",
-        "prod": "yarn install --force && export PORT=80 && pm2 start cc-ms-artblocks-nft.js -i max"
+        "prod": "yarn install --force && export PORT=8080 && pm2 start cc-ms-artblocks-nft.js -i max"
     },
     "dependencies": {
         "node-p5": "^1.0.4"
