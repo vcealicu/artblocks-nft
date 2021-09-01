@@ -74,19 +74,19 @@ serverForApi.handleRequest = function(request, response) {
         return;
     }
 
-    serverForApi.sendResponse(response, httpVerbNotAllowed, 'application/json', '', responseTypes.notAcceptable);
+    serverForApi.sendResponse(response, httpVerbNotAllowed, 'application/json', '', true, responseTypes.notAcceptable);
 };
 
 serverForApi.routeRequestAndRespond = function(requestMethod, response, currentPath, callParams) {
     let endpointToExecute = allEndpoints.find(function(pathToCheck) { return pathToCheck.Url === currentPath; });
     if (endpointToExecute === undefined || endpointToExecute.HttpVerb !== requestMethod) {
-        serverForApi.sendResponse(response, pathNotFoundError, 'application/json', '', responseTypes.notFound);
+        serverForApi.sendResponse(response, pathNotFoundError, 'application/json', '', true, responseTypes.notFound);
         return;
     }
 
     let hitTimestamp = Math.floor(new Date().getTime() / 1000);
 
-    endpointToExecute.execute(callParams, hitTimestamp, function(err, responseData, fileName) {
+    endpointToExecute.execute(callParams, hitTimestamp, function(err, responseData, fileName, shouldCache) {
         if (err) {
             const responseToSend = Object.assign({}, responseBaseObject);
             responseToSend.Response = "Error";
@@ -98,16 +98,20 @@ serverForApi.routeRequestAndRespond = function(requestMethod, response, currentP
                     responseToSend.Type = err.frontend.type;
                 }
             }
-            serverForApi.sendResponse(response, responseToSend, 'application/json', fileName, responseTypes.notAcceptable);
+            serverForApi.sendResponse(response, responseToSend, 'application/json', fileName, true, responseTypes.notAcceptable);
             return;
         }
-        serverForApi.sendResponse(response, responseData, 'image/png', fileName, responseTypes.ok);
+        serverForApi.sendResponse(response, responseData, 'image/png', fileName, shouldCache, responseTypes.ok);
     });
 
 };
 
-serverForApi.sendResponse = function(response, responseData, responseContentType, fileName, statusCode) {
+serverForApi.sendResponse = function(response, responseData, responseContentType, fileName, shouldCache, statusCode) {
     response.setHeader('Content-Security-Policy', 'frame-ancestors \'none\'');
+    response.setHeader('X-Robots-Tag', 'noindex');
+    if(shouldCache){
+        response.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+    }
     if (responseContentType === 'image/png') {
         response.setHeader('Content-Disposition', 'inline; filename="' + fileName + '"');
         response.writeHead(statusCode, { 'Content-Type': responseContentType });
