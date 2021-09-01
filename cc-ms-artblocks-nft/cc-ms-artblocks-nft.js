@@ -30,7 +30,7 @@ apiCoreMs.addEndpoint({
             },
             canvasBuffer: () => {
                 return function(dataBuffer) {
-                    executeCallback(null, dataBuffer, seed + '.png');
+                    executeCallback(null, dataBuffer, seed + '.png', callParams.seed !== undefined);
                 };
             }
         };
