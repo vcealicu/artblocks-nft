@@ -43,7 +43,7 @@ serverForApi.getInfoFromRequest = function(request) {
         if (getParamName === 'INTERNAL') { continue; }
         callParams[getParamName] = getParamValue;
     }
-    console.log(getParamValue, request.headers, currentClientIp);
+    console.log(urlObj.searchParams, request.headers, currentClientIp);
     return { urlObj, callParams };
 };
 
