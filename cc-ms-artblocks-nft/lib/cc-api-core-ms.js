@@ -29,8 +29,16 @@ const httpVerbNotAllowed = {
     Data: {}
 };
 
+const httpMoreRequestsNotAllowed = {
+    Response: 'Error',
+    Message: 'You can only have 1 request in flight at a time',
+    Type: 0,
+    Data: {}
+};
+
 let allEndpoints = [];
 let serverForApi = {};
+let requestsInFlight ={};
 
 serverForApi.getInfoFromRequest = function(request) {
     let callParams = { INTERNAL: {} };
@@ -43,18 +51,26 @@ serverForApi.getInfoFromRequest = function(request) {
         if (getParamName === 'INTERNAL') { continue; }
         callParams[getParamName] = getParamValue;
     }
-    console.log(urlObj.searchParams, request.headers, currentClientIp);
-    return { urlObj, callParams };
+    console.log(request.url);
+    return { urlObj, callParams, currentClientIp };
 };
 
 serverForApi.handleRequest = function(request, response) {
-    let { urlObj, callParams } = serverForApi.getInfoFromRequest(request);
+    let { urlObj, callParams, currentClientIp } = serverForApi.getInfoFromRequest(request);
+    if(requestsInFlight[currentClientIp] === undefined){
+        requestsInFlight[currentClientIp] = 1;
+    } else {
+        requestsInFlight[currentClientIp]++;
+        serverForApi.sendResponse(response, httpMoreRequestsNotAllowed, 'application/json', '', true, currentClientIp, responseTypes.notAcceptable);
+        return;
+    }
+    
     if (request.method === 'OPTIONS') {
-        serverForApi.sendResponse(response, {}, 'application/json', '', responseTypes.ok);
+        serverForApi.sendResponse(response, {}, 'application/json', '', true, currentClientIp, responseTypes.ok);
         return;
     }
     if (request.method === 'GET') {
-        serverForApi.routeRequestAndRespond(request.method, response, urlObj.pathname, callParams);
+        serverForApi.routeRequestAndRespond(request.method, response, urlObj.pathname, callParams, currentClientIp);
         return;
     }
     if (request.method == 'POST' || request.method == 'PUT') {
@@ -70,18 +86,18 @@ serverForApi.handleRequest = function(request, response) {
         });
         request.on('end', function() {
             callParams.INTERNAL.POST_BODY = body;
-            serverForApi.routeRequestAndRespond(request.method, response, urlObj.pathname, callParams);
+            serverForApi.routeRequestAndRespond(request.method, response, urlObj.pathname, callParams, currentClientIp);
         });
         return;
     }
 
-    serverForApi.sendResponse(response, httpVerbNotAllowed, 'application/json', '', true, responseTypes.notAcceptable);
+    serverForApi.sendResponse(response, httpVerbNotAllowed, 'application/json', '', true, currentClientIp, responseTypes.notAcceptable);
 };
 
-serverForApi.routeRequestAndRespond = function(requestMethod, response, currentPath, callParams) {
+serverForApi.routeRequestAndRespond = function(requestMethod, response, currentPath, callParams, currentClientIp) {
     let endpointToExecute = allEndpoints.find(function(pathToCheck) { return pathToCheck.Url === currentPath; });
     if (endpointToExecute === undefined || endpointToExecute.HttpVerb !== requestMethod) {
-        serverForApi.sendResponse(response, pathNotFoundError, 'application/json', '', true, responseTypes.notFound);
+        serverForApi.sendResponse(response, pathNotFoundError, 'application/json', '', true, currentClientIp, responseTypes.notFound);
         return;
     }
 
@@ -99,15 +115,19 @@ serverForApi.routeRequestAndRespond = function(requestMethod, response, currentP
                     responseToSend.Type = err.frontend.type;
                 }
             }
-            serverForApi.sendResponse(response, responseToSend, 'application/json', fileName, true, responseTypes.notAcceptable);
+            serverForApi.sendResponse(response, responseToSend, 'application/json', fileName, true, currentClientIp, responseTypes.notAcceptable);
             return;
         }
-        serverForApi.sendResponse(response, responseData, 'image/png', fileName, shouldCache, responseTypes.ok);
+        serverForApi.sendResponse(response, responseData, 'image/png', fileName, shouldCache, currentClientIp, responseTypes.ok);
     });
 
 };
 
-serverForApi.sendResponse = function(response, responseData, responseContentType, fileName, shouldCache, statusCode) {
+serverForApi.sendResponse = function(response, responseData, responseContentType, fileName, shouldCache, currentClientIp, statusCode) {
+    requestsInFlight[currentClientIp]--;
+    if(requestsInFlight[currentClientIp] === 0){
+        delete requestsInFlight[currentClientIp];
+    }
     response.setHeader('Content-Security-Policy', 'frame-ancestors \'none\'');
     response.setHeader('X-Robots-Tag', 'noindex');
     if(shouldCache){
