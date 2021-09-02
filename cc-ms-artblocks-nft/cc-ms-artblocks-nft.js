@@ -22,7 +22,7 @@ apiCoreMs.addEndpoint({
     Examples: [],
     execute: function(callParams, hitTimestamp, executeCallback) {
         let seed = '0x' + crypto.randomBytes(20).toString("hex");
-        if(callParams.seed === undefined && callParams.seed.length>10){
+        if(callParams.seed !== undefined && callParams.seed.length>10){
             if ( isValidHex(callParams.seed) ){
                 seed = callParams.seed;
             } else {
