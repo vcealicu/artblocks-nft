@@ -29,7 +29,6 @@ apiCoreMs.addEndpoint({
                 callParams.seed = undefined;
             }
         }
-        let seed = callParams.seed || ;
         let resourcesToPreload = {
             seed: () => {
                 return seed;
